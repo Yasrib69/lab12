@@ -7,6 +7,7 @@ from .deanonymize_keep import DeanonymizeKeep
 from .encrypt import Encrypt
 
 from .decrypt import Decrypt  # isort:skip
+from .genz import GenZ
 from .hash import Hash
 from .keep import Keep
 from .mask import Mask
@@ -31,6 +32,7 @@ __all__ = [
     "Keep",
     "DeanonymizeKeep",
     "Replace",
+    "GenZ",
     "Custom",
     "Encrypt",
     "Decrypt",
