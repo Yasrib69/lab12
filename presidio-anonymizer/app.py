@@ -6,12 +6,14 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
-from werkzeug.exceptions import BadRequest, HTTPException
 from presidio_anonymizer import AnonymizerEngine, DeanonymizeEngine
 from presidio_anonymizer.entities import InvalidParamError
 from presidio_anonymizer.services.app_entities_convertor import AppEntitiesConvertor
+from presidio_anonymizer.services.custom_operators import GenZOperator
+from werkzeug.exceptions import BadRequest, HTTPException
 
 DEFAULT_PORT = "3000"
+
 LOGGING_CONF_FILE = "logging.ini"
 
 WELCOME_MESSAGE = r"""
@@ -71,7 +73,6 @@ class Server:
             content = request.get_json()
             if not content:
                 raise BadRequest("Invalid request json")
-
             text = content.get("text", "")
             deanonymize_entities = AppEntitiesConvertor.deanonymize_entities_from_json(
                 content
@@ -95,16 +96,31 @@ class Server:
         def deanonymizers():
             """Return a list of supported deanonymizers."""
             return jsonify(self.deanonymize.get_deanonymizers())
-
         @self.app.route("/genz-preview", methods=["GET"])
         def genz_preview():
-            """Return example Gen-Z anonymizer output."""
-            payload = {
+            return jsonify({
                 "example": "Call Emily at 577-988-1234",
-                "example_output": "Call GOAT at vibe check",
-                "description": "Example output of the genz anonymizer.",
-            }
-            return jsonify(payload)
+                "example output": "Call GOAT at vibe check",
+                "description": "Example output of the genz anonymizer."
+            })
+
+        # Gen-Z anonymizer route
+        @self.app.route("/genz", methods=["POST"])
+        def genz_anonymize():
+            content = request.get_json()
+            if not content:
+                raise BadRequest("Invalid request json")
+
+            analyzer_results = AppEntitiesConvertor.analyzer_results_from_json(
+                content.get("analyzer_results")
+            )
+            operator = {"genz": GenZOperator()}
+            result = self.anonymizer.anonymize(
+                text=content.get("text", ""),
+                analyzer_results=analyzer_results,
+                operators=operator
+            )
+            return Response(result.to_json(), mimetype="application/json")
 
         @self.app.errorhandler(InvalidParamError)
         def invalid_param(err):
@@ -122,11 +138,9 @@ class Server:
             self.logger.error(f"A fatal error occurred during execution: {e}")
             return jsonify(error="Internal server error"), 500
 
-
-def create_app():  # noqa
+def create_app(): # noqa
     server = Server()
     return server.app
-
 
 if __name__ == "__main__":
     app = create_app()
